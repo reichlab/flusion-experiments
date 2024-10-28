@@ -36,10 +36,6 @@ q_labels = ['0.01', '0.025', '0.05', '0.1', '0.15', '0.2', '0.25', '0.3', '0.35'
             '0.4', '0.45', '0.5', '0.55', '0.6', '0.65', '0.7', '0.75', '0.8',
             '0.85', '0.9', '0.95', '0.975', '0.99']
 
-# data transformations to use
-transforms = ['sqrt', '4rt']
-
-
 
 def date_to_ew_str(row, date_col_name='wk_end_date'):
     ew = pymmwr.date_to_epiweek(datetime.date.fromisoformat(row[date_col_name]))
@@ -405,7 +401,7 @@ def get_season_hol(start_year):
     
   hol = hol.reset_index()
   hol.columns = ['date', 'holiday']
-  hol = hol.loc[hol['holiday'].isin(['Thanksgiving', 'Christmas'])]
+  hol = hol.loc[hol['holiday'].isin(['Thanksgiving Day', 'Christmas Day'])]
   
   hol['season'] = str(start_year) + '/' + str(start_year + 1)[-2:]
   
@@ -546,7 +542,7 @@ def get_sarix_preds(transform):
   # season week relative to christmas
   df = df.merge(
       get_holidays() \
-        .query("holiday == 'Christmas'") \
+        .query("holiday == 'Christmas Day'") \
         .drop(columns=['holiday', 'date']) \
         .rename(columns={'season_week': 'xmas_week'}),
       how='left',
