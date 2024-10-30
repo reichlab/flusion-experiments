@@ -16,34 +16,23 @@ import datetime
 
 from sarix import sarix
 
-
-# config settings
-
-# date of forecast generation
-# forecast_date = datetime.date.today()
-forecast_date = datetime.date.fromisoformat("2024-01-03")
-
-# next Saturday: weekly forecasts are relative to this date
-ref_date = forecast_date - datetime.timedelta((forecast_date.weekday() + 2) % 7 - 7)
-print(f'reference date = {ref_date}')
-
-# maximum forecast horizon
-max_horizon = 5
-
-# quantile levels at which to generate predictions
-q_levels = [0.01, 0.025, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35,
-            0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80,
-            0.85, 0.90, 0.95, 0.975, 0.99]
-q_labels = ['0.01', '0.025', '0.05', '0.1', '0.15', '0.2', '0.25', '0.3', '0.35',
-            '0.4', '0.45', '0.5', '0.55', '0.6', '0.65', '0.7', '0.75', '0.8',
-            '0.85', '0.9', '0.95', '0.975', '0.99']
+from utils import parse_args, build_save_path
 
 
-def get_sarix_preds(power_transform):
+def main():
+    # parse arguments
+    model_config, run_config = parse_args()
+    print(run_config.ref_date)
+    
+    # fit model and generate predictions
+    get_sarix_preds(model_config, run_config)
+
+
+def get_sarix_preds(model_config, run_config):
     fdl = FluDataLoader('../../data-raw')
-    df = fdl.load_data(hhs_kwargs={'as_of': ref_date},
-                       sources=['hhs'],
-                       power_transform=power_transform)
+    df = fdl.load_data(hhs_kwargs={'as_of': run_config.ref_date},
+                       sources=model_config.sources,
+                       power_transform=model_config.power_transform)
     
     # season week relative to christmas
     df = df.merge(
@@ -56,34 +45,35 @@ def get_sarix_preds(power_transform):
     .assign(delta_xmas = lambda x: x['season_week'] - x['xmas_week'])
     df['xmas_spike'] = np.maximum(3 - np.abs(df['delta_xmas']), 0)
     
-    batched_xy = df[["inc_trans_cs", "xmas_spike"]].values.reshape(len(df['location'].unique()), -1, 2)
+    xy_colnames = ["inc_trans_cs"] + model_config.x
+    batched_xy = df[xy_colnames].values.reshape(len(df['location'].unique()), -1, 2)
     
     sarix_fit_all_locs_theta_pooled = sarix.SARIX(
         xy = batched_xy,
-        p = 8,
-        d = 0,
-        P = 0,
-        D = 0,
-        season_period = 1,
-        transform='none',
-        theta_pooling='shared',
-        sigma_pooling='none',
-        forecast_horizon = 5,
-        num_warmup = 1000,
-        num_samples = 1000,
-        num_chains = 1)
+        p = model_config.p,
+        d = model_config.d,
+        P = model_config.P,
+        D = model_config.D,
+        season_period = model_config.season_period,
+        transform='none', # transformations are handled outside of SARIX
+        theta_pooling=model_config.theta_pooling,
+        sigma_pooling=model_config.sigma_pooling,
+        forecast_horizon = run_config.max_horizon,
+        num_warmup = run_config.num_warmup,
+        num_samples = run_config.num_samples,
+        num_chains = run_config.num_chains)
     
     pred_qs = np.percentile(sarix_fit_all_locs_theta_pooled.predictions[..., :, :, 0],
-                            np.array(q_levels) * 100, axis=0)
+                            np.array(run_config.q_levels) * 100, axis=0)
     
     df_hhs_last_obs = df.groupby(['location']).tail(1)
     
     preds_df = pd.concat([
         pd.DataFrame(pred_qs[i, :, :]) \
         .set_axis(df_hhs_last_obs['location'], axis='index') \
-        .set_axis(np.arange(1, max_horizon+1), axis='columns') \
+        .set_axis(np.arange(1, run_config.max_horizon+1), axis='columns') \
         .assign(output_type_id = q_label) \
-        for i, q_label in enumerate(q_labels)
+        for i, q_label in enumerate(run_config.q_labels)
     ]) \
     .reset_index() \
     .melt(['location', 'output_type_id'], var_name='horizon') \
@@ -91,7 +81,7 @@ def get_sarix_preds(power_transform):
     
     # build data frame with predictions on the original scale
     preds_df['value'] = (preds_df['value'] + preds_df['inc_trans_center_factor']) * preds_df['inc_trans_scale_factor']
-    if power_transform == '4rt':
+    if model_config.power_transform == '4rt':
         preds_df['value'] = np.maximum(preds_df['value'], 0.0) ** 4
     else:
         preds_df['value'] = np.maximum(preds_df['value'], 0.0) ** 2
@@ -103,18 +93,20 @@ def get_sarix_preds(power_transform):
     preds_df = preds_df[['location', 'wk_end_date', 'horizon', 'output_type_id', 'value']]
     
     preds_df['target_end_date'] = preds_df['wk_end_date'] + pd.to_timedelta(7*preds_df['horizon'], unit='days')
-    preds_df['reference_date'] = ref_date
+    preds_df['reference_date'] = run_config.ref_date
     preds_df['horizon'] = preds_df['horizon'] - 2
     preds_df['output_type'] = 'quantile'
     preds_df['target'] = 'wk inc flu hosp'
     preds_df.drop(columns='wk_end_date', inplace=True)
     
-    if not Path(f'../../retrospective-hub/model-output/UMass-sarix_{power_transform}').exists():
-        Path(f'../../retrospective-hub/model-output/UMass-sarix_{power_transform}').mkdir(parents=True)
-    
-    preds_df.to_csv(f'../../retrospective-hub/model-output/UMass-sarix_{power_transform}/{str(ref_date)}-UMass-sarix_{power_transform}.csv', index=False)
+    # save
+    save_path = build_save_path(
+        root=run_config.output_root,
+        run_config=run_config,
+        model_config=model_config
+    )
+    preds_df.to_csv(save_path, index=False)
 
 
-
-for power_transform in ['4rt']:
-    get_sarix_preds(power_transform)
+if __name__ == '__main__':
+    main()
