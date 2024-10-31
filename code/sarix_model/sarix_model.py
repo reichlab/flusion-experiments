@@ -22,6 +22,7 @@ from utils import parse_args, build_save_path
 def main():
     # parse arguments
     model_config, run_config = parse_args()
+    print(model_config.model_name)
     print(run_config.ref_date)
     
     # fit model and generate predictions
@@ -46,7 +47,7 @@ def get_sarix_preds(model_config, run_config):
     df['xmas_spike'] = np.maximum(3 - np.abs(df['delta_xmas']), 0)
     
     xy_colnames = ["inc_trans_cs"] + model_config.x
-    batched_xy = df[xy_colnames].values.reshape(len(df['location'].unique()), -1, 2)
+    batched_xy = df[xy_colnames].values.reshape(len(df['location'].unique()), -1, len(xy_colnames))
     
     sarix_fit_all_locs_theta_pooled = sarix.SARIX(
         xy = batched_xy,
