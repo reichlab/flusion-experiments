@@ -22,13 +22,17 @@ ref_dates = [
 
 def run_command(command):
     """Run system command"""
-    os.system(command)
+    subprocess.run(command)
 
 
 output_root = '../../retrospective-hub/model-output'
 
-commands = [f'python sarix_model.py --ref_date {ref_date} --output_root {output_root} --model_name {model_name}' \
-                for (model_name, ref_date) in product(model_names, ref_dates)]
+commands = [[
+    "python sarix_model.py",
+    "--ref-date", ref_date,
+    "--output_root", output_root,
+    "--model_name", model_name]
+    for (model_name, ref_date) in product(model_names, ref_dates)]
 
 for command in commands:
     run_command(command)
