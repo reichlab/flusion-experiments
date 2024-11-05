@@ -1,9 +1,8 @@
 # This script should be run with code/sarix_model as the working directory:
 # python retrospective-experiments/sarix_experiments.py
 
-import os
 import datetime
-from multiprocessing import Pool
+import subprocess
 from itertools import product
 
 # model_names = [
@@ -28,8 +27,9 @@ def run_command(command):
 output_root = '../../retrospective-hub/model-output'
 
 commands = [[
-    "python sarix_model.py",
-    "--ref-date", ref_date,
+    "python",
+    "sarix_model.py",
+    "--ref_date", ref_date,
     "--output_root", output_root,
     "--model_name", model_name]
     for (model_name, ref_date) in product(model_names, ref_dates)]
