@@ -78,6 +78,8 @@ def parse_args():
 
 
 def _make_parser():
+    configs_dir = Path('configs')
+    available_models = [f.name[:-3] for f in list(configs_dir.glob('*.py')) if f.name != 'base.py']
     parser = argparse.ArgumentParser(description='Run gradient boosting model for flu prediction')
     parser.add_argument('--ref_date',
                         help='reference date for predictions in format YYYY-MM-DD; a Saturday',
@@ -85,7 +87,7 @@ def _make_parser():
                         default=None)
     parser.add_argument('--model_name',
                         help='Model name',
-                        choices=['sarix_p8_4rt_thetashared_sigmanone_xmas_spike'],
+                        choices=available_models,
                         default='sarix_p8_4rt_thetashared_sigmanone_xmas_spike')
     parser.add_argument('--short_run',
                         help='Flag to do a short run; overrides model-default num_bags to 10 and uses 3 quantile levels',
