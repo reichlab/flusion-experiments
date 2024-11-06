@@ -9,8 +9,8 @@ import math
 import numpy as np
 import pandas as pd
 
-from data_pipeline.loader import FluDataLoader
-from data_pipeline.utils import get_holidays
+from iddata.loader import FluDataLoader
+from iddata.utils import get_holidays
 
 import datetime
 
@@ -30,8 +30,8 @@ def main():
 
 
 def get_sarix_preds(model_config, run_config):
-    fdl = FluDataLoader('../../data-raw')
-    df = fdl.load_data(hhs_kwargs={'as_of': run_config.ref_date},
+    fdl = FluDataLoader()
+    df = fdl.load_data(nhsn_kwargs={'as_of': run_config.ref_date},
                        sources=model_config.sources,
                        power_transform=model_config.power_transform)
     
@@ -67,18 +67,18 @@ def get_sarix_preds(model_config, run_config):
     pred_qs = np.percentile(sarix_fit_all_locs_theta_pooled.predictions[..., :, :, 0],
                             np.array(run_config.q_levels) * 100, axis=0)
     
-    df_hhs_last_obs = df.groupby(['location']).tail(1)
+    df_nhsn_last_obs = df.groupby(['location']).tail(1)
     
     preds_df = pd.concat([
         pd.DataFrame(pred_qs[i, :, :]) \
-        .set_axis(df_hhs_last_obs['location'], axis='index') \
+        .set_axis(df_nhsn_last_obs['location'], axis='index') \
         .set_axis(np.arange(1, run_config.max_horizon+1), axis='columns') \
         .assign(output_type_id = q_label) \
         for i, q_label in enumerate(run_config.q_labels)
     ]) \
     .reset_index() \
     .melt(['location', 'output_type_id'], var_name='horizon') \
-    .merge(df_hhs_last_obs, on='location', how='left')
+    .merge(df_nhsn_last_obs, on='location', how='left')
     
     # build data frame with predictions on the original scale
     preds_df['value'] = (preds_df['value'] + preds_df['inc_trans_center_factor']) * preds_df['inc_trans_scale_factor']

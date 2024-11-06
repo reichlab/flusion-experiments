@@ -6,7 +6,7 @@ import pandas as pd
 
 import lightgbm as lgb
 
-from data_pipeline.loader import FluDataLoader
+from iddata.loader import FluDataLoader
 from preprocess import create_features_and_targets
 
 
@@ -27,8 +27,8 @@ def run_gbq_flu_model(model_config, run_config):
         ilinet_kwargs = {'scale_to_positive': False}
         flusurvnet_kwargs = {'burden_adj': False}
     
-    fdl = FluDataLoader('../../data-raw')
-    df = fdl.load_data(hhs_kwargs={'as_of': run_config.ref_date},
+    fdl = FluDataLoader()
+    df = fdl.load_data(nhsn_kwargs={'as_of': run_config.ref_date},
                        ilinet_kwargs=ilinet_kwargs,
                        flusurvnet_kwargs=flusurvnet_kwargs,
                        sources=model_config.sources,
@@ -119,7 +119,7 @@ def _train_gbq_and_predict(model_config, run_config,
                     'inc_trans_cs', 'horizon',
                     'inc_trans_center_factor', 'inc_trans_scale_factor']
     preds_df = df_test_w_preds[cols_to_keep + run_config.q_labels]
-    preds_df = preds_df.loc[(preds_df['source'] == 'hhs')]
+    preds_df = preds_df.loc[(preds_df['source'] == 'nhsn')]
     preds_df = pd.melt(preds_df,
                        id_vars=cols_to_keep,
                        var_name='quantile',

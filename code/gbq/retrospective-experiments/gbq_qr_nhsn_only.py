@@ -1,4 +1,4 @@
-# This script generates predictions for the gbq_qr_hhs_only model for all reference dates.
+# This script generates predictions for the gbq_qr_nhsn_only model for all reference dates.
 # Retrospective model fits are generated using the data that would have been available in
 # real time.
 #
@@ -6,7 +6,7 @@
 # real time, these model outputs are stored in flusion/retrospective-hub.
 
 # This script should be run with code/gbq as the working directory:
-# python retrospective-experiments/gbq_qr_hhs_only.py
+# python retrospective-experiments/gbq_qr_nhsn_only.py
 
 import os
 import datetime
@@ -24,7 +24,7 @@ missing_ref_dates = [
 
 output_root = '../../retrospective-hub/model-output'
 
-commands = [f'python gbq.py --ref_date {ref_date} --output_root {output_root} --model_name gbq_qr_hhs_only' \
+commands = [f'python gbq.py --ref_date {ref_date} --output_root {output_root} --model_name gbq_qr_nhsn_only' \
                 for ref_date in missing_ref_dates]
 
 with Pool(processes=2) as pool:

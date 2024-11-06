@@ -4,7 +4,7 @@ base_config = SimpleNamespace(
     model_class = 'sarix',
     
     # data sources and adjustments for reporting issues
-    sources = ['hhs'],
+    sources = ['nhsn'],
 
     # fit locations separately or jointly
     fit_locations_separately = False,

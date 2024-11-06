@@ -71,7 +71,7 @@ def _make_parser():
                         default=None)
     parser.add_argument('--model_name',
                         help='Model name',
-                        choices=['gbq_qr', 'gbq_qr_no_level', 'gbq_qr_no_reporting_adj', 'gbq_qr_hhs_only',
+                        choices=['gbq_qr', 'gbq_qr_no_level', 'gbq_qr_no_reporting_adj', 'gbq_qr_nhsn_only',
                                  'gbq_qr_fit_locations_separately', 'gbq_qr_no_transform'],
                         default='gbq_qr')
     parser.add_argument('--short_run',
