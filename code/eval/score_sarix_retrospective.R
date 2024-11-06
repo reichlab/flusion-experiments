@@ -20,6 +20,9 @@ forecasts <- hub_con |>
   ) |>
   dplyr::collect() |>
   as_model_out_tbl()
+forecasts <- forecasts |>
+  dplyr::filter(horizon < 3) %>%
+  dplyr::mutate(horizon = horizon + 1)
 
 oracle_output <- read_csv("https://raw.githubusercontent.com/cdcepi/FluSight-forecast-hub/refs/heads/main/target-data/target-hospital-admissions.csv") |>
   dplyr::mutate(target_end_date = date, observation = value) |>
@@ -37,15 +40,18 @@ scores <- scores |>
     p = stringr::str_extract(model_id, "_p(.*?)_"),
     p = as.integer(substr(p, 3, nchar(p) - 1)),
     theta_pooling = stringr::str_extract(model_id, "_theta(.*?)_"),
-    theta_pooling = substr(theta_pooling, 7, nchar(theta_pooling) - 1)
+    theta_pooling = substr(theta_pooling, 7, nchar(theta_pooling) - 1),
+    covariates = ifelse(grepl("_xmas_spike", model_id, fixed = TRUE),
+                        "xmas_spike",
+                        "none")
   )
 
 ggplot(
   data = scores,
   mapping = aes(x = p, y = wis, color = theta_pooling)
 ) +
-  geom_point(mapping = aes(shape = theta_pooling)) +
-  geom_line(mapping = aes(linetype = theta_pooling, group = theta_pooling)) +
+  geom_point(mapping = aes(shape = covariates)) +
+  geom_line(mapping = aes(linetype = covariates, group = paste0(theta_pooling, covariates))) +
   theme_bw()
 
 ggplot(
@@ -55,3 +61,27 @@ ggplot(
   geom_point(mapping = aes(shape = theta_pooling)) +
   geom_line(mapping = aes(linetype = theta_pooling, group = theta_pooling)) +
   theme_bw()
+
+
+
+sub_hub_path <- "../../submissions-hub"
+sub_hub_con <- connect_hub(sub_hub_path)
+
+orig_sarix_forecasts <- sub_hub_con |>
+  dplyr::filter(
+    output_type == "quantile",
+    model_id == "UMass-sarix",
+    reference_date >= "2023-10-14",
+    target_end_date <= "2024-04-27",
+    location != "US",
+    location != "78"
+  ) |>
+  dplyr::collect() |>
+  as_model_out_tbl()
+
+orig_sarix_scores <- hubEvals::score_model_out(
+  model_out_tbl = orig_sarix_forecasts,
+  target_observations = oracle_output,
+  metrics = c("ae_median", "wis"),
+  by = "model_id"
+)
